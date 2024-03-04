@@ -3,8 +3,14 @@ import {
   GraphQLList,
   GraphQLNonNull,
   GraphQLObjectType,
+  GraphQLResolveInfo,
   GraphQLString,
 } from 'graphql';
+import {
+  ResolveTree,
+  parseResolveInfo,
+  simplifyParsedResolveInfoFragmentWithType,
+} from 'graphql-parse-resolve-info';
 import { UUIDType } from '../uuid.js';
 import { Context } from '../types.js';
 import { User } from '@prisma/client';
@@ -81,7 +87,41 @@ export const user = {
 
 export const users = {
   type: new GraphQLList(userType),
-  resolve: async (_, _args, context: Context) => {
-    return await context.prisma.user.findMany();
+  resolve: async (_, _args, context: Context, resolveInfo: GraphQLResolveInfo) => {
+    const parsedResolveInfoFragment = parseResolveInfo(resolveInfo);
+    const { fields } = simplifyParsedResolveInfoFragmentWithType(
+      parsedResolveInfoFragment as ResolveTree,
+      new GraphQLList(userType),
+    );
+
+    const hasSubscribedToUserField = 'subscribedToUser' in fields;
+    const hasUserSubscribedToField = 'userSubscribedTo' in fields;
+
+    const users = await context.prisma.user.findMany({
+      include: {
+        subscribedToUser: hasSubscribedToUserField,
+        userSubscribedTo: hasUserSubscribedToField,
+      },
+    });
+
+    users.forEach((user) => {
+      if (hasSubscribedToUserField) {
+        const ids = user.subscribedToUser.map((u) => u.subscriberId);
+        context.loaders.subscribedToUserLoader.prime(
+          user.id,
+          users.filter((u) => ids.includes(u.id)),
+        );
+      }
+
+      if (hasUserSubscribedToField) {
+        const ids = user.userSubscribedTo.map((u) => u.authorId);
+        context.loaders.userSubscribedToLoader.prime(
+          user.id,
+          users.filter((u) => ids.includes(u.id)),
+        );
+      }
+    });
+
+    return users;
   },
 };
