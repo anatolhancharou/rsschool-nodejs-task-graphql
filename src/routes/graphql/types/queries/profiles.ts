@@ -39,11 +39,7 @@ export const profileType: GraphQLObjectType = new GraphQLObjectType({
     memberType: {
       type: new GraphQLNonNull(memberObjType),
       resolve: async (source: Profile, _, context: Context) => {
-        return await context.prisma.memberType.findUnique({
-          where: {
-            id: source.memberTypeId,
-          },
-        });
+        return await context.loaders.memberTypeLoader.load(source.memberTypeId);
       },
     },
     memberTypeId: {

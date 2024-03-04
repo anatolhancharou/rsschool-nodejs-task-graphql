@@ -27,7 +27,7 @@ export const memberObjType: GraphQLObjectType = new GraphQLObjectType({
   name: 'MemberType',
   fields: () => ({
     id: {
-      type: MemberEnumType,
+      type: new GraphQLNonNull(MemberEnumType),
     },
     discount: {
       type: new GraphQLNonNull(GraphQLFloat),
